@@ -329,7 +329,7 @@ def procread(host, port, mul, rnd)
     eprint(rdb, "open")
     err = true
   end
-  recs = Hash.new
+  recs = Hash::new
   rnum = rdb.rnum
   for i in 1..rnum
     buf = sprintf("%08d", rnd ? rand(rnum) + 1: i)
@@ -698,6 +698,10 @@ def procmisc(host, port, rnum)
     eprint(rdb, "sync")
     err = true
   end
+  if !rdb.optimize
+    eprint(rdb, "optimize")
+    err = true
+  end
   if !rdb.vanish
     eprint(rdb, "vanish")
     err = true
@@ -773,6 +777,18 @@ def proctable(host, port, rnum)
     eprint(rdb, "setindex")
     err = true
   end
+  if !rdb.setindex("type", RDBTBL::ITDECIMAL)
+    eprint(rdb, "setindex")
+    err = true
+  end
+  if !rdb.setindex("flag", RDBTBL::ITTOKEN)
+    eprint(rdb, "setindex")
+    err = true
+  end
+  if !rdb.setindex("text", RDBTBL::ITQGRAM)
+    eprint(rdb, "setindex")
+    err = true
+  end
   printf("writing:\n")
   for i in 1..rnum
     id = rdb.genuid
@@ -789,7 +805,10 @@ def proctable(host, port, rnum)
       vbuf += "," if vbuf.length > 0
       vbuf += pt.to_s
     end
-    cols["flag"] = vbuf if vbuf.length > 0
+    if vbuf.length > 0
+      cols["flag"] = vbuf
+      cols["text"] = vbuf
+    end
     if !rdb.put(id, cols)
       eprint(rdb, "put")
       err = true
@@ -837,10 +856,11 @@ def proctable(host, port, rnum)
   end
   printf("searching:\n")
   qry = RDBQRY::new(rdb)
-  names = [ "", "str", "num", "type", "flag", "c1" ]
+  names = [ "", "str", "num", "type", "flag", "text", "c1" ]
   ops = [ RDBQRY::QCSTREQ, RDBQRY::QCSTRINC, RDBQRY::QCSTRBW, RDBQRY::QCSTREW, RDBQRY::QCSTRAND,
           RDBQRY::QCSTROR, RDBQRY::QCSTROREQ, RDBQRY::QCSTRRX, RDBQRY::QCNUMEQ, RDBQRY::QCNUMGT,
           RDBQRY::QCNUMGE, RDBQRY::QCNUMLT, RDBQRY::QCNUMLE, RDBQRY::QCNUMBT, RDBQRY::QCNUMOREQ ]
+  ftsops = [ RDBQRY::QCFTSPH, RDBQRY::QCFTSAND, RDBQRY::QCFTSOR, RDBQRY::QCFTSEX ]
   types = [ RDBQRY::QOSTRASC, RDBQRY::QOSTRDESC, RDBQRY::QONUMASC, RDBQRY::QONUMDESC ]
   for i in 1..rnum
     qry = RDBQRY::new(rdb) if rand(10) > 0
@@ -848,6 +868,7 @@ def proctable(host, port, rnum)
     for j in 1..cnum
       name = names[rand(names.length)]
       op = ops[rand(ops.length)]
+      op = ftsops[rand(ftsops.length)] if rand(10) == 0
       op |= RDBQRY::QCNEGATE if rand(20) == 0
       op |= RDBQRY::QCNOIDX if rand(20) == 0
       expr = rand(i).to_s
@@ -888,6 +909,9 @@ def proctable(host, port, rnum)
         err = true
         break
       end
+    elsif rand(20) == 0
+      qry.setlimit(10)
+      res = qry.metasearch([ qry ], RDBQRY::MSUNION + rand(3))
     else
       qry.setlimit(rand(i), rand(10)) if rand(3) != 0
       res = qry.search
@@ -898,6 +922,37 @@ def proctable(host, port, rnum)
         printf(" (%08d)\n", i)
       end
     end
+  end
+  pkey = rand(rnum)
+  rdb.put(pkey, { "name" => "mikio", "birth" => "19780211" })
+  if rdb.putkeep(pkey, {})
+    eprint(rdb, "putkeep")
+    err = true
+  elsif rdb.ecode != RDB::EKEEP
+    eprint(rdb, "putkeep")
+    err = true
+  end
+  if !rdb.get(pkey)
+    eprint(rdb, "get")
+    err = true
+  end
+  if !rdb.out(pkey)
+    eprint(rdb, "out")
+    err = true
+  end
+  if rdb.get(pkey)
+    eprint(rdb, "get")
+    err = true
+  elsif rdb.ecode() != RDB::ENOREC
+    eprint(rdb, "get")
+    err = true
+  end
+  if rdb.out(pkey)
+    eprint(rdb, "out")
+    err = true
+  elsif rdb.ecode() != RDB::ENOREC
+    eprint(rdb, "out")
+    err = true
   end
   printf("record number: %d\n", rdb.rnum)
   printf("size: %d\n", rdb.size)

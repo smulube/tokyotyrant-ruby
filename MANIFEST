@@ -1,0 +1,13 @@
+tcrtest.rb
+install.rb
+test.rb
+COPYING
+tokyotyrant.rb
+README
+package.sh
+MANIFEST
+makedoc.sh
+example/tcrdbex.rb
+example/tcrdbtblex.rb
+Rakefile
+tokyotyrant.gemspec

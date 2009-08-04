@@ -1,18 +1,18 @@
 #--
-# Pure Ruby interface of Tokyo Cabinet
+# Pure Ruby interface of Tokyo Tyrant
 #                                                       Copyright (C) 2006-2008 Mikio Hirabayashi
-#  This file is part of Tokyo Cabinet.
-#  Tokyo Cabinet is free software; you can redistribute it and/or modify it under the terms of
+#  This file is part of Tokyo Tyrant.
+#  Tokyo Tyrant is free software; you can redistribute it and/or modify it under the terms of
 #  the GNU Lesser General Public License as published by the Free Software Foundation; either
-#  version 2.1 of the License or any later version.  Tokyo Cabinet is distributed in the hope
+#  version 2.1 of the License or any later version.  Tokyo Tyrant is distributed in the hope
 #  that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
 #  License for more details.
 #  You should have received a copy of the GNU Lesser General Public License along with Tokyo
-#  Cabinet; if not, write to the Free Software Foundation, Inc., 59 Temple Place, Suite 330,
+#  Tyrant; if not, write to the Free Software Foundation, Inc., 59 Temple Place, Suite 330,
 #  Boston, MA 02111-1307 USA.
 #++
-#:include:overview.rd
+#:include:README
 
 
 require "socket"
@@ -487,46 +487,46 @@ module TokyoTyrant
     # Get forward matching keys.%%
     # `<i>prefix</i>' specifies the prefix of the corresponding keys.%%
     # `<i>max</i>' specifies the maximum number of keys to be fetched.  If it is not defined or negative, no limit is specified.%%
-    # The return value is an array of the keys of the corresponding records.  This method does never fail and return an empty array even if no record corresponds.%%
+    # The return value is an array of the keys of the corresponding records.  This method does never fail.  It returns an empty array even if no record corresponds.%%
     # Note that this method may be very slow because every key in the database is scanned.%%
     def fwmkeys(prefix, max = -1)
       prefix = _argstr(prefix)
       max = _argnum(max)
       if !@sock
         @ecode = EINVALID
-        return Array.new
+        return Array::new
       end
       sbuf = [0xC8, 0x58, prefix.length, max].pack("CCNN")
       sbuf += prefix
       if !_send(sbuf)
         @ecode = ESEND
-        return Array.new
+        return Array::new
       end
       code = _recvcode
       if code == -1
         @ecode = ERECV
-        return Array.new
+        return Array::new
       end
       if code != 0
         @ecode = ENOREC
-        return Array.new
+        return Array::new
       end
       knum = _recvint32
       if knum < 0
         @ecode = ERECV
-        return Array.new
+        return Array::new
       end
-      keys = Array.new
+      keys = Array::new
       for i in 1..knum
         ksiz = _recvint32()
         if ksiz < 0
           @ecode = ERECV
-          return Array.new
+          return Array::new
         end
         kbuf = _recv(ksiz)
         if !kbuf
           @ecode = ERECV
-          return Array.new
+          return Array::new
         end
         keys.push(_retstr(kbuf))
       end
@@ -659,6 +659,32 @@ module TokyoTyrant
       end
       return true
     end
+    # Optimize the storage.%%
+    # `<i>params</i>' specifies the string of the tuning parameters.  If it is not defined, it is not used.%%
+    # If successful, the return value is true, else, it is false.%%
+    def optimize(params = nil)
+      params = params ? _argstr(params) : ""
+      if !@sock
+        @ecode = EINVALID
+        return false
+      end
+      sbuf = [0xC8, 0x71, params.length].pack("CCN")
+      sbuf += params
+      if !_send(sbuf)
+        @ecode = ESEND
+        return false
+      end
+      code = _recvcode
+      if code == -1
+        @ecode = ERECV
+        return false
+      end
+      if code != 0
+        @ecode = EMISC
+        return false
+      end
+      return true
+    end
     # Remove all records.%%
     # If successful, the return value is true, else, it is false.%%
     def vanish()
@@ -666,7 +692,7 @@ module TokyoTyrant
         @ecode = EINVALID
         return false
       end
-      sbuf = [0xC8, 0x71].pack("CC")
+      sbuf = [0xC8, 0x72].pack("CC")
       if !_send(sbuf)
         @ecode = ESEND
         return false
@@ -692,7 +718,7 @@ module TokyoTyrant
         @ecode = EINVALID
         return false
       end
-      sbuf = [0xC8, 0x72, path.length].pack("CCN")
+      sbuf = [0xC8, 0x73, path.length].pack("CCN")
       sbuf += path
       if !_send(sbuf)
         @ecode = ESEND
@@ -730,7 +756,12 @@ module TokyoTyrant
         @ecode = EMISC
         return 0
       end
-      return _recvint64
+      rv = _recvint64
+      if rv < 0
+        @ecode = ERECV
+        return 0
+      end
+      return rv
     end
     # Get the size of the database.%%
     # The return value is the size of the database or 0 if the object does not connect to any database server.%%
@@ -753,7 +784,12 @@ module TokyoTyrant
         @ecode = EMISC
         return 0
       end
-      return _recvint64
+      rv = _recvint64
+      if rv < 0
+        @ecode = ERECV
+        return 0
+      end
+      return rv
     end
     # Get the status string of the database server.%%
     # The return value is the status message of the database or `nil' if the object does not connect to any database server.  The message format is TSV.  The first field of each line means the parameter name and the second field means the value.%%
@@ -795,7 +831,7 @@ module TokyoTyrant
     # If successful, the return value is an array of the result.  `nil' is returned on failure.%%
     def misc(name, args = [], opts = 0)
       name = _argstr(name)
-      args = Array.new if !args.is_a?(Array)
+      args = Array::new if !args.is_a?(Array)
       opts = _argnum(opts)
       if !@sock
         @ecode = EINVALID
@@ -821,7 +857,7 @@ module TokyoTyrant
         @ecode = EMISC
         return nil
       end
-      res = Array.new
+      res = Array::new
       for i in 1..rnum
         esiz = _recvint32
         if esiz < 0
@@ -854,7 +890,7 @@ module TokyoTyrant
     # Hash-compatible method.%%
     # Alias of `get'.%%
     def fetch(key)
-      return out(key)
+      return get(key)
     end
     # Hash-compatible method.%%
     # Check existence of a key.%%
@@ -883,9 +919,9 @@ module TokyoTyrant
       return rnum
     end
     # Hash-compatible method.%%
-    # Alias of `rnum > 0'.%%
+    # Alias of `rnum < 1'.%%
     def empty?
-      return rnum > 0
+      return rnum < 1
     end
     # Hash-compatible method.%%
     # Alias of `put'.%%
@@ -932,7 +968,7 @@ module TokyoTyrant
     # Hash-compatible method.%%
     # Get an array of all keys.%%
     def keys
-      tkeys = Array.new
+      tkeys = Array::new
       return tkeys if !iterinit
       while key = iternext
         tkeys.push(key)
@@ -942,7 +978,7 @@ module TokyoTyrant
     # Hash-compatible method.%%
     # Get an array of all keys.%%
     def values
-      tvals = Array.new
+      tvals = Array::new
       return tvals if !iterinit
       while key = iternext
         value = get(key)
@@ -1009,10 +1045,15 @@ module TokyoTyrant
     def _recv(len)
       return "" if len < 1
       begin
-        str = @sock.recv(len, 0)
+        str = @sock.recv(len)
+        return nil if str.length < 1
         len -= str.length
         while len > 0
           tstr = @sock.recv(len, 0)
+          if tstr.length < 1
+            tstr = @sock.recv(len, 0)
+            return nil if tstr.length < 1
+          end
           len -= tstr.length
           str += tstr
         end
@@ -1059,6 +1100,10 @@ module TokyoTyrant
     ITLEXICAL = 0
     # index type: decimal string
     ITDECIMAL = 1
+    # index type: token inverted index
+    ITTOKEN = 2
+    # index type: q-gram inverted index
+    ITQGRAM = 3
     # index type: optimize
     ITOPT = 9998
     # index type: void
@@ -1077,7 +1122,7 @@ module TokyoTyrant
     def put(pkey, cols)
       pkey = _argstr(pkey)
       raise ArgumentError if !cols.is_a?(Hash)
-      args = Array.new
+      args = Array::new
       args.push(pkey)
       cols.each do |ckey, cvalue|
         args.push(ckey)
@@ -1094,14 +1139,18 @@ module TokyoTyrant
     def putkeep(pkey, cols)
       pkey = _argstr(pkey)
       raise ArgumentError if !cols.is_a?(Hash)
-      args = Array.new
+      args = Array::new
       args.push(pkey)
       cols.each do |ckey, cvalue|
         args.push(ckey)
         args.push(cvalue)
       end
       rv = misc("putkeep", args, 0)
-      return rv ? true : false
+      if !rv
+        @ecode = EKEEP if @ecode == EMISC
+        return false
+      end
+      return true
     end
     # Concatenate columns of the existing record.%%
     # `<i>pkey</i>' specifies the primary key.%%
@@ -1111,7 +1160,7 @@ module TokyoTyrant
     def putcat(pkey, cols)
       pkey = _argstr(pkey)
       raise ArgumentError if !cols.is_a?(Hash)
-      args = Array.new
+      args = Array::new
       args.push(pkey)
       cols.each do |ckey, cvalue|
         args.push(ckey)
@@ -1125,18 +1174,28 @@ module TokyoTyrant
     # If successful, the return value is true, else, it is false.%%
     def out(pkey)
       pkey = _argstr(pkey)
-      return super(pkey)
+      args = Array::new
+      args.push(pkey)
+      rv = misc("out", args, 0)
+      if !rv
+        @ecode = ENOREC if @ecode == EMISC
+        return false
+      end
+      return true
     end
     # Retrieve a record.%%
     # `<i>pkey</i>' specifies the primary key.%%
     # If successful, the return value is a hash of the columns of the corresponding record.  `nil' is returned if no record corresponds.%%
     def get(pkey)
       pkey = _argstr(pkey)
-      args = Array.new
+      args = Array::new
       args.push(pkey)
       rv = misc("get", args)
-      return nil if !rv
-      cols = Hash.new()
+      if !rv
+        @ecode = ENOREC if @ecode == EMISC
+        return nil
+      end
+      cols = Hash::new()
       cnum = rv.length
       cnum -= 1
       i = 0
@@ -1154,7 +1213,7 @@ module TokyoTyrant
       rv = super(recs)
       return -1 if rv < 0
       recs.each do |pkey, value|
-        cols = Hash.new
+        cols = Hash::new
         cary = value.split("\0")
         cnum = cary.size - 1
         i = 0
@@ -1168,12 +1227,12 @@ module TokyoTyrant
     end
     # Set a column index.%%
     # `<i>name</i>' specifies the name of a column.  If the name of an existing index is specified, the index is rebuilt.  An empty string means the primary key.%%
-    # `<i>type</i>' specifies the index type: `TokyoCabinet::RDBTBL::ITLEXICAL' for lexical string, `TokyoCabinet::RDBTBL::ITDECIMAL' for decimal string.  If it is `TokyoCabinet::RDBTBL::ITOPT', the index is optimized.  If it is `TokyoCabinet::RDBTBL::ITVOID', the index is removed.  If `TokyoCabinet::RDBTBL::ITKEEP' is added by bitwise-or and the index exists, this method merely returns failure.%%
+    # `<i>type</i>' specifies the index type: `TokyoTyrant::RDBTBL::ITLEXICAL' for lexical string, `TokyoTyrant::RDBTBL::ITDECIMAL' for decimal string, `TokyoTyrant::RDBTBL::ITTOKEN' for token inverted index, `TokyoTyrant::RDBTBL::ITQGRAM' for q-gram inverted index.  If it is `TokyoTyrant::RDBTBL::ITOPT', the index is optimized.  If it is `TokyoTyrant::RDBTBL::ITVOID', the index is removed.  If `TokyoTyrant::RDBTBL::ITKEEP' is added by bitwise-or and the index exists, this method merely returns failure.%%
     # If successful, the return value is true, else, it is false.%%
     def setindex(name, type)
       name = _argstr(name)
       type = _argnum(type)
-      args = Array.new
+      args = Array::new
       args.push(name)
       args.push(type)
       rv = misc("setindex", args, 0)
@@ -1182,7 +1241,7 @@ module TokyoTyrant
     # Generate a unique ID number.%%
     # The return value is the new unique ID number or -1 on failure.%%
     def genuid()
-      rv = misc("genuid", Array.new, 0)
+      rv = misc("genuid", Array::new, 0)
       return -1 if !rv
       return rv[0]
     end
@@ -1219,6 +1278,14 @@ module TokyoTyrant
     QCNUMBT = 13
     # query condition: number is equal to at least one token in
     QCNUMOREQ = 14
+    # query condition: full-text search with the phrase of
+    QCFTSPH = 15
+    # query condition: full-text search with all tokens in
+    QCFTSAND = 16
+    # query condition: full-text search with at least one token in
+    QCFTSOR = 17
+    # query condition: full-text search with the compound expression of
+    QCFTSEX = 18
     # query condition: negation flag
     QCNEGATE = 1 << 24
     # query condition: no index flag
@@ -1231,20 +1298,23 @@ module TokyoTyrant
     QONUMASC = 2
     # order type: number descending
     QONUMDESC = 3
+    # set operation type: union
+    MSUNION = 0
+    # set operation type: intersection
+    MSISECT = 1
+    # set operation type: difference
+    MSDIFF = 2
     # Create a query object.%%
     # `<i>rdb</i>' specifies the remote database object.%%
     # The return value is the new query object.%%
     def initialize(rdb)
       raise ArgumentError if !rdb.is_a?(TokyoTyrant::RDBTBL)
       @rdb = rdb
-      @args = Array.new
-      def self.setmax(max) # for backward compatibility
-        setlimit(max)
-      end
+      @args = [ "hint" ]
     end
     # Add a narrowing condition.%%
     # `<i>name</i>' specifies the name of a column.  An empty string means the primary key.%%
-    # `<i>op</i>' specifies an operation type: `TokyoCabinet::RDBQRY::QCSTREQ' for string which is equal to the expression, `TokyoCabinet::RDBQRY::QCSTRINC' for string which is included in the expression, `TokyoCabinet::RDBQRY::QCSTRBW' for string which begins with the expression, `TokyoCabinet::RDBQRY::QCSTREW' for string which ends with the expression, `TokyoCabinet::RDBQRY::QCSTRAND' for string which includes all tokens in the expression, `TokyoCabinet::RDBQRY::QCSTROR' for string which includes at least one token in the expression, `TokyoCabinet::RDBQRY::QCSTROREQ' for string which is equal to at least one token in the expression, `TokyoCabinet::RDBQRY::QCSTRRX' for string which matches regular expressions of the expression, `TokyoCabinet::RDBQRY::QCNUMEQ' for number which is equal to the expression, `TokyoCabinet::RDBQRY::QCNUMGT' for number which is greater than the expression, `TokyoCabinet::RDBQRY::QCNUMGE' for number which is greater than or equal to the expression, `TokyoCabinet::RDBQRY::QCNUMLT' for number which is less than the expression, `TokyoCabinet::RDBQRY::QCNUMLE' for number which is less than or equal to the expression, `TokyoCabinet::RDBQRY::QCNUMBT' for number which is between two tokens of the expression, `TokyoCabinet::RDBQRY::QCNUMOREQ' for number which is equal to at least one token in the expression.  All operations can be flagged by bitwise-or: `TokyoCabinet::RDBQRY::QCNEGATE' for negation, `TokyoCabinet::RDBQRY::QCNOIDX' for using no index.%%
+    # `<i>op</i>' specifies an operation type: `TokyoTyrant::RDBQRY::QCSTREQ' for string which is equal to the expression, `TokyoTyrant::RDBQRY::QCSTRINC' for string which is included in the expression, `TokyoTyrant::RDBQRY::QCSTRBW' for string which begins with the expression, `TokyoTyrant::RDBQRY::QCSTREW' for string which ends with the expression, `TokyoTyrant::RDBQRY::QCSTRAND' for string which includes all tokens in the expression, `TokyoTyrant::RDBQRY::QCSTROR' for string which includes at least one token in the expression, `TokyoTyrant::RDBQRY::QCSTROREQ' for string which is equal to at least one token in the expression, `TokyoTyrant::RDBQRY::QCSTRRX' for string which matches regular expressions of the expression, `TokyoTyrant::RDBQRY::QCNUMEQ' for number which is equal to the expression, `TokyoTyrant::RDBQRY::QCNUMGT' for number which is greater than the expression, `TokyoTyrant::RDBQRY::QCNUMGE' for number which is greater than or equal to the expression, `TokyoTyrant::RDBQRY::QCNUMLT' for number which is less than the expression, `TokyoTyrant::RDBQRY::QCNUMLE' for number which is less than or equal to the expression, `TokyoTyrant::RDBQRY::QCNUMBT' for number which is between two tokens of the expression, `TokyoTyrant::RDBQRY::QCNUMOREQ' for number which is equal to at least one token in the expression, `TokyoTyrant::RDBQRY::QCFTSPH' for full-text search with the phrase of the expression, `TokyoTyrant::RDBQRY::QCFTSAND' for full-text search with all tokens in the expression, `TokyoTyrant::RDBQRY::QCFTSOR' for full-text search with at least one token in the expression, `TokyoTyrant::RDBQRY::QCFTSEX' for full-text search with the compound expression.  All operations can be flagged by bitwise-or: `TokyoTyrant::RDBQRY::QCNEGATE' for negation, `TokyoTyrant::RDBQRY::QCNOIDX' for using no index.%%
     # `<i>expr</i>' specifies an operand exression.%%
     # The return value is always `nil'.%%
     def addcond(name, op, expr)
@@ -1253,9 +1323,9 @@ module TokyoTyrant
     end
     # Set the order of the result.%%
     # `<i>name</i>' specifies the name of a column.  An empty string means the primary key.%%
-    # `<i>type</i>' specifies the order type: `TokyoCabinet::RDBQRY::QOSTRASC' for string ascending, `TokyoCabinet::RDBQRY::QOSTRDESC' for string descending, `TokyoCabinet::RDBQRY::QONUMASC' for number ascending, `TokyoCabinet::RDBQRY::QONUMDESC' for number descending.%%
+    # `<i>type</i>' specifies the order type: `TokyoTyrant::RDBQRY::QOSTRASC' for string ascending, `TokyoTyrant::RDBQRY::QOSTRDESC' for string descending, `TokyoTyrant::RDBQRY::QONUMASC' for number ascending, `TokyoTyrant::RDBQRY::QONUMDESC' for number descending.  If it is not defined, `TokyoTyrant::RDBQRY::QOSTRASC' is specified.%%
     # The return value is always `nil'.%%
-    def setorder(name, type)
+    def setorder(name, type = QOSTRASC)
       @args.push("setorder" + "\0" + name + "\0" + type.to_s)
       return nil
     end
@@ -1268,35 +1338,43 @@ module TokyoTyrant
       return nil
     end
     # Execute the search.%%
-    # The return value is an array of the primary keys of the corresponding records.  This method does never fail and return an empty array even if no record corresponds.%%
+    # The return value is an array of the primary keys of the corresponding records.  This method does never fail.  It returns an empty array even if no record corresponds.%%
     def search()
+      @hint = ""
       rv = @rdb.misc("search", @args, RDB::MONOULOG)
-      return rv ? rv : Array.new
+      return Array::new if !rv
+      _popmeta(rv)
+      return rv
     end
     # Remove each corresponding record.%%
     # If successful, the return value is true, else, it is false.%%
     def searchout()
-      args = Array.new(@args)
+      args = @args.dup
       args.push("out")
+      @hint = ""
       rv = @rdb.misc("search", args, 0)
-      return rv ? true : false
+      return false if !rv
+      _popmeta(rv)
+      return true
     end
     # Get records corresponding to the search.%%
     # `<i>names</i>' specifies an array of column names to be fetched.  An empty string means the primary key.  If it is not defined, every column is fetched.%%
-    # The return value is an array of column hashes of the corresponding records.  This method does never fail and return an empty list even if no record corresponds.%%
+    # The return value is an array of column hashes of the corresponding records.  This method does never fail.  It returns an empty list even if no record corresponds.%%
     # Due to the protocol restriction, this method can not handle records with binary columns including the "\0" chracter.%%
     def searchget(names = nil)
       raise ArgumentError if names && !names.is_a?(Array)
-      args = Array.new(@args)
+      args = @args.dup
       if names
         args.push("get\0" + names.join("\0"))
       else
         args.push("get")
       end
+      @hint = ""
       rv = @rdb.misc("search", args, RDB::MONOULOG)
-      return Array.new if !rv
+      return Array::new if !rv
+      _popmeta(rv)
       for i in 0...rv.size
-        cols = Hash.new
+        cols = Hash::new
         cary = rv[i].split("\0")
         cnum = cary.size - 1
         j = 0
@@ -1311,10 +1389,63 @@ module TokyoTyrant
     # Get the count of corresponding records.%%
     # The return value is the count of corresponding records or 0 on failure.%%
     def searchcount()
-      args = Array.new(@args)
+      args = @args.dup
       args.push("count")
+      @hint = ""
       rv = @rdb.misc("search", args, RDB::MONOULOG)
-      return rv ? rv[0].to_i : 0
+      return 0 if !rv
+      _popmeta(rv)
+      return rv.size > 0 ? rv[0].to_i : 0
+    end
+    # Get the hint string.%%
+    # The return value is the hint string.%%
+    def hint()
+      return @hint
+    end
+    # Retrieve records with multiple query objects and get the set of the result.%%
+    # `<i>others</i>' specifies an array of the query objects except for the self object.%%
+    # `<i>type</i>' specifies a set operation type: `TokyoTyrant::RDBQRY::MSUNION' for the union set, `TokyoTyrant::RDBQRY::MSISECT' for the intersection set, `TokyoTyrant::RDBQRY::MSDIFF' for the difference set.  If it is not defined, `TokyoTyrant::RDBQRY::MSUNION' is specified.%%
+    # The return value is an array of the primary keys of the corresponding records.  This method does never fail.  It returns an empty array even if no record corresponds.%%
+    # If the first query object has the order setting, the result array is sorted by the order.%%
+    def metasearch(others, type = MSUNION)
+      raise ArgumentError if !others.is_a?(Array)
+      args = @args.dup
+      others.each do |other|
+        next if !other.is_a?(RDBQRY)
+        args.push("next")
+        other._args.each do |arg|
+          args.push(arg)
+        end
+      end
+      args.push("mstype\0" + type.to_s)
+      @hint = ""
+      rv = @rdb.misc("metasearch", args, RDB::MONOULOG)
+      return Array::new if !rv
+      _popmeta(rv)
+      return rv
+    end
+    #--------------------------------
+    # private methods
+    #--------------------------------
+    protected
+    # Get the internal arguments.
+    def _args
+      return @args
+    end
+    private
+    # Pop meta data from the result list.
+    def _popmeta(res)
+      i = res.length - 1
+      while i >= 0
+        pkey = res[i]
+        if pkey =~ /^\0\0\[\[HINT\]\]\n/
+          @hint = pkey.gsub(/^\0\0\[\[HINT\]\]\n/, "")
+          res.pop
+        else
+          break
+        end
+        i -= 1
+      end
     end
   end
 end
